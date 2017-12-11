@@ -12,7 +12,6 @@ load_current_value do |desired|
 
   begin
     res = ::Nexus3::Api.new(api_endpoint, api_username, api_password).run_script('get_task', desired.task_name)
-    current_value_does_not_exist! if res == 'null'
     config = JSON.parse(res)
     current_value_does_not_exist! if config.nil?
     ::Chef::Log.debug "Config is: #{config}"
@@ -41,33 +40,7 @@ action :create do
       username new_resource.api_username
       password new_resource.api_password
 
-      content <<-EOS
-// Freely adapted from
-// https://github.com/savoirfairelinux/ansible-nexus3-oss/blob/master/files/groovy/create_task.groovy
-import org.sonatype.nexus.scheduling.TaskConfiguration;
-import org.sonatype.nexus.scheduling.TaskInfo;
-import org.sonatype.nexus.scheduling.TaskScheduler;
-import org.sonatype.nexus.scheduling.schedule.Schedule;
-
-import groovy.json.JsonSlurper;
-
-def params = new JsonSlurper().parseText(args);
-
-TaskScheduler taskScheduler = container.lookup(TaskScheduler.class.getName());
-TaskInfo existingTask = taskScheduler.listsTasks().find { TaskInfo taskInfo ->
-   taskInfo.getName() == params.name;
-}
-if (existingTask && !existingTask.remove()) {
-   throw new RuntimeException("Could not remove currently running task: " + params.name);
-}
-
-TaskConfiguration taskConfiguration = taskScheduler.createTaskConfigurationInstance('script');
-taskConfiguration.setName(params.name);
-taskConfiguration.setString('source', params.source);
-Schedule schedule = taskScheduler.scheduleFactory.cron(new Date(), params.crontab);
-
-taskScheduler.scheduleTask(taskConfiguration, schedule);
-      EOS
+      content ::Nexus3::Scripts.groovy_content('upsert_task', node)
     end
   end
 end
@@ -81,20 +54,7 @@ action :delete do
       script_name 'delete_task'
       args new_resource.task_name
 
-      content <<-EOS
-import org.sonatype.nexus.scheduling.TaskConfiguration;
-import org.sonatype.nexus.scheduling.TaskInfo;
-import org.sonatype.nexus.scheduling.TaskScheduler;
-
-TaskScheduler taskScheduler = container.lookup(TaskScheduler.class.getName());
-TaskInfo existingTask = taskScheduler.listsTasks().find { TaskInfo taskInfo ->
-    taskInfo.getName() == args;
-}
-
-if (existingTask && !existingTask.remove()) {
-   throw new RuntimeException("Could not remove currently running task: " + args);
-}
-    EOS
+      content ::Nexus3::Scripts.groovy_content('delete_task', node)
 
       endpoint new_resource.api_endpoint
       username new_resource.api_username
@@ -119,23 +79,7 @@ action_class do
       username new_resource.api_username
       password new_resource.api_password
 
-      content <<-EOS
-import org.sonatype.nexus.scheduling.TaskConfiguration;
-import org.sonatype.nexus.scheduling.TaskInfo;
-import org.sonatype.nexus.scheduling.TaskScheduler;
-
-import groovy.json.JsonOutput;
-
-TaskScheduler taskScheduler = container.lookup(TaskScheduler.class.getName());
-
-TaskInfo existingTask = taskScheduler.listsTasks().find { TaskInfo taskInfo ->
-    taskInfo.getName() == args;
-}
-
-if (existingTask) {
-    return JsonOutput.toJson(existingTask.getConfiguration().asMap());
-}
-      EOS
+      content ::Nexus3::Scripts.groovy_content('get_task', node)
     end
   end
 

@@ -19,6 +19,8 @@ before_script:
   - sudo iptables -L DOCKER || ( echo "DOCKER iptables chain missing" ; sudo iptables -N DOCKER )
 
 script:
+  - openssl version
+  - ruby -ropenssl -e 'puts OpenSSL::OPENSSL_LIBRARY_VERSION'
   - bundle exec rubocop --version
   - bundle exec rubocop
   - bundle exec foodcritic --version

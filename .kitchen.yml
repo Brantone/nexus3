@@ -33,8 +33,6 @@ suites:
       - nexus3_test::delete_script
       - nexus3_test::run_script
     attributes:
-       nexus3_test:
-         connections_retries: 10
        nexus3:
          api:
            sensitive: false
